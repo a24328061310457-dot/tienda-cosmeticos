@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tienda Cosméticos</title>
+<style>
+body { font-family: Arial; margin: 0; background: #f8f9fa; }
+header { background: #d63384; color: white; padding: 15px; text-align: center; }
+nav { display: flex; justify-content: center; background: #222; }
+nav button { margin: 5px; padding: 10px; cursor: pointer; color: white; background: #d63384; border: none; border-radius: 5px; }
+.container { padding: 20px; }
+.productos, .carrito { display: flex; flex-wrap: wrap; justify-content: center; }
+.card { background: white; width: 220px; margin: 10px; padding: 10px; border-radius: 10px; box-shadow: 0 0 10px gray; text-align: center; }
+button { margin: 5px; padding: 8px; cursor: pointer; border-radius: 5px; border: none; }
+.btn-editar { background: orange; color: white; }
+.btn-eliminar { background: red; color: white; }
+.btn-carrito { background: green; color: white; }
+.btn-eliminar-carrito { background: darkred; color: white; }
+input { padding: 8px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>💄 Tienda de Cosméticos</h1>
+</header>
+
+<nav>
+<button onclick="mostrarPestana('productos')">Productos</button>
+<button onclick="mostrarPestana('carrito')">Carrito</button>
+</nav>
+
+<div class="container">
+
+<!-- PESTAÑA PRODUCTOS -->
+<div id="productosTab">
+<h3>Agregar producto</h3>
+<input type="text" id="nombre" placeholder="Nombre">
+<input type="text" id="marca" placeholder="Marca">
+<input type="number" id="precio" placeholder="Precio">
+<button onclick="agregarProducto()">Agregar</button>
+
+<h3>Productos disponibles</h3>
+<div id="productos" class="productos"></div>
+</div>
+
+<!-- PESTAÑA CARRITO -->
+<div id="carritoTab" style="display:none;">
+<h3>Carrito de Compras</h3>
+<div id="carrito" class="carrito"></div>
+<h4 id="totalCarrito">Total: $0</h4>
+<button onclick="vaciarCarrito()">Vaciar Carrito</button>
+</div>
+
+</div>
+
+<script>
+let productosGlobal = [];
+
+// ================= PESTAÑAS =================
+function mostrarPestana(tab) {
+    document.getElementById('productosTab').style.display = (tab==='productos') ? 'block':'none';
+    document.getElementById('carritoTab').style.display = (tab==='carrito') ? 'block':'none';
+}
+
+// ================= PRODUCTOS =================
+function cargarProductos() {
+    fetch('http://127.0.0.1:5000/productos')
+    .then(r => r.json())
+    .then(data => {
+        productosGlobal = data;
+        pintarProductos(data);
+    });
+}
+
+function pintarProductos(data) {
+    let cont = document.getElementById('productos');
+    cont.innerHTML = "";
+    data.forEach(p => {
+        cont.innerHTML += `
+        <div class="card">
+            <h3>${p.nombre}</h3>
+            <p>Marca: ${p.marca}</p>
+            <p>Precio: $${p.precio}</p>
+            <button class="btn-editar" onclick="editarProducto('${p.id}','${p.nombre}','${p.marca}',${p.precio})">Editar</button>
+            <button class="btn-eliminar" onclick="eliminarProducto('${p.id}')">Eliminar</button>
+            <button class="btn-carrito" onclick="agregarCarrito('${p.nombre}','${p.marca}',${p.precio})">🛒 Carrito</button>
+        </div>`;
+    });
+}
+
+function agregarProducto() {
+    let data = {
+        nombre: document.getElementById('nombre').value,
+        marca: document.getElementById('marca').value,
+        precio: parseFloat(document.getElementById('precio').value)
+    };
+    fetch('http://127.0.0.1:5000/productos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(() => {
+        document.getElementById('nombre').value = "";
+        document.getElementById('marca').value = "";
+        document.getElementById('precio').value = "";
+        cargarProductos();
+    });
+}
+
+function eliminarProducto(id) {
+    fetch('http://127.0.0.1:5000/productos/' + id, {method:'DELETE'}).then(()=>cargarProductos());
+}
+
+function editarProducto(id,nombre,marca,precio){
+    document.getElementById('nombre').value = nombre;
+    document.getElementById('marca').value = marca;
+    document.getElementById('precio').value = precio;
+
+    document.querySelector('button[onclick="agregarProducto()"]').innerText="Actualizar";
+    document.querySelector('button[onclick="agregarProducto()"]').onclick=function(){
+        let data={
+            nombre: document.getElementById('nombre').value,
+            marca: document.getElementById('marca').value,
+            precio: parseFloat(document.getElementById('precio').value)
+        };
+        fetch('http://127.0.0.1:5000/productos/'+id,{method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(()=>{
+            document.getElementById('nombre').value="";
+            document.getElementById('marca').value="";
+            document.getElementById('precio').value="";
+            document.querySelector('button[onclick="agregarProducto()"]').innerText="Agregar";
+            document.querySelector('button[onclick="agregarProducto()"]').onclick=agregarProducto;
+            cargarProductos();
+        });
+    }
+}
+
+// ================= CARRITO =================
+function agregarCarrito(nombre, marca, precio){
+    fetch('http://127.0.0.1:5000/carrito',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nombre, marca, precio})})
+    .then(()=>cargarCarrito());
+}
+
+function cargarCarrito(){
+    fetch('http://127.0.0.1:5000/carrito')
+    .then(r=>r.json())
+    .then(data=>{
+        let div=document.getElementById('carrito');
+        div.innerHTML="";
+        data.carrito.forEach((p,index)=>{
+            div.innerHTML += `
+            <div class="card">
+                <h3>${p.nombre}</h3>
+                <p>Marca: ${p.marca}</p>
+                <p>Precio: $${p.precio}</p>
+                <button class="btn-eliminar-carrito" onclick="eliminarCarrito(${index})">Eliminar</button>
+            </div>`;
+        });
+        document.getElementById('totalCarrito').innerText = "Total: $" + data.total;
+    });
+}
+
+// Eliminar producto individual del carrito
+function eliminarCarrito(index){
+    fetch('http://127.0.0.1:5000/carrito')
+    .then(r=>r.json())
+    .then(data=>{
+        let lista = data.carrito;
+        lista.splice(index,1); // quitar del array
+        fetch('http://127.0.0.1:5000/carrito',{method:'DELETE'}) // vaciar
+        .then(()=>{
+            lista.forEach(p=>{
+                fetch('http://127.0.0.1:5000/carrito',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+            });
+            setTimeout(cargarCarrito,200); // recargar
+        });
+    });
+}
+
+function vaciarCarrito(){
+    fetch('http://127.0.0.1:5000/carrito',{method:'DELETE'}).then(()=>cargarCarrito());
+}
+
+// ================= CARGA INICIAL =================
+cargarProductos();
+cargarCarrito();
+</script>
+
+</body>
+</html>
